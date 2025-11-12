@@ -41,3 +41,9 @@ jobs:
           curl -X POST -H 'Content-type: application/json' \
               --data "{\"text\":\"${MESSAGE}\"}" \
               "${{ secrets.SLACK_WEBHOOK_URL }}"
+
+      - name: Send Slack message to hp2
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data "{\"text\":\"${MESSAGE}\"}" \
+          ${{ secrets.SLACK_WEBHOOK_URL_HP2 }}
