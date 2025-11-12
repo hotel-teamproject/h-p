@@ -1,31 +1,43 @@
 name: notify-branch-created
 
 on:
-    create:
+  create:
+    types: [branch]
+  push:
+    branches: ['main']                 # 또는 '**' (전체 브랜치)
+    paths:
+      - '.github/workflows/**'         # 워크플로 파일 변경에만 반응
+  workflow_dispatch:
 
 jobs:
   slack-notify:
     runs-on: ubuntu-latest
-
     steps:
-        - name: Set Slack message for branch create
-          if: ${{ github.ref_type == 'branch' }}
-          run: |
-            REPO="${GITHUB_REPOSITORY}"
-            BRANCH="${GITHUB_REF_NAME}"
-            ACTOR="${GITHUB_ACTOR}"  
+      - name: Build Slack message
+        run: |
+          REPO="${GITHUB_REPOSITORY}"
+          BRANCH="${GITHUB_REF_NAME}"
+          ACTOR="${GITHUB_ACTOR}"
 
-            MESSAGE="[브랜치 생성] $ACTOR님 $REPO에서 $BRANCH를 생성했습니다"
+          if [ "${GITHUB_EVENT_NAME}" = "create" ]; then
+            MESSAGE="[브랜치 생성] ${ACTOR}님이 ${REPO}에 ${BRANCH}를 생성했습니다"
+          elif [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+            MESSAGE="[워크플로 변경] ${ACTOR}님이 ${REPO}:${BRANCH}에 푸시했습니다 (${SHORT_SHA})"
+          else
+            MESSAGE="Triggered: ${GITHUB_EVENT_NAME}"
+          fi
 
-            echo "MESSAGE<<EOF" >> $GITHUB_ENV
-            echo "$MESSAGE" >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
+          {
+            echo "MESSAGE<<EOF"
+            echo "${MESSAGE}"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
 
-        - name: Send Slack message
-          if: env.MESSAGE != ''
-          run: |
-            echo "Send to Slack: $MESSAGE"
-
-            curl -X POST -H 'Content-type: application/json' \
-            --data "{\"text\":\"${MESSAGE}\"}" \
-            ${{ secrets.SLACK_WEBHOOK_URL }}
+      - name: Send to Slack
+        if: env.MESSAGE != ''
+        run: |
+          echo "Send to Slack: $MESSAGE"
+          curl -X POST -H 'Content-type: application/json' \
+              --data "{\"text\":\"${MESSAGE}\"}" \
+              "${{ secrets.SLACK_WEBHOOK_URL }}"
